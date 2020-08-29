@@ -1,17 +1,19 @@
-var reg = (o, n) => o ? o[n] : '';
-var cn = (o, s) => o ? o.getElementsByClassName(s) : null;
-var tn = (o, s) => o ? o.getElementsByTagName(s) : null;
-var gi = (o, s) => o ? o.getElementById(s) : null;
-var rando = (n) => Math.round(Math.random() * n);
-var delay = (ms) => new Promise(res => setTimeout(res, ms));
-
+const reg = (o, n) => o ? o[n] : '';
+const cn = (o, s) => o ? o.getElementsByClassName(s) : null;
+const tn = (o, s) => o ? o.getElementsByTagName(s) : null;
+const gi = (o, s) => o ? o.getElementById(s) : null;
+const rando = (n) => Math.round(Math.random() * n);
+const delay = (ms) => new Promise(res => setTimeout(res, ms));
+const ele = (t) => document.createElement(t);
+const attr = (o, k, v) => o.setAttribute(k, v);
+const a = (l, r) => r.forEach(a => attr(l, a[0], a[1]));
 
 function convert2TsvAndDownload(records, named_file){
-  var fileArray = records;
-  var tsvReady = (s) => s ? s.replace(/\t|\u0009/g, ' ').replace(/\r|\n/g, '↵').replace(/"/g, "'") : s;
-  var unqHsh = (a, o) => a.filter(i => o.hasOwnProperty(i) ? false : (o[i] = true));
-  var unq = (arr) => arr.filter((e, p, a) => a.indexOf(e) == p);
-  var str = (o) => typeof o == 'object' ? tsvReady(JSON.stringify(o).replace(/\n|\r/g, ' ')) : o;
+  const fileArray = records;
+  const tsvReady = (s) => s ? s.replace(/\t|\u0009/g, ' ').replace(/\r|\n/g, '↵').replace(/"/g, "'") : s;
+  const unqHsh = (a, o) => a.filter(i => o.hasOwnProperty(i) ? false : (o[i] = true));
+  const unq = (arr) => arr.filter((e, p, a) => a.indexOf(e) == p);
+  const str = (o) => typeof o == 'object' ? tsvReady(JSON.stringify(o).replace(/\n|\r/g, ' ')) : o;
   var firstLevel = fileArray.map(el => Object.entries(el));
   var header = unqHsh(firstLevel.map(el => el.map(itm => itm[0])).flat(),{});
   var table = [header];
@@ -159,8 +161,13 @@ function parseLibraryPage(doc){
 
 
 async function loopThroughtAudibleLibrary(){
-  var contain_arr = [];
-  for(let i=0; i<200; i++){
+  gi(document, 'downloading_percentage_txt').innerText = 'Retrieving titles...';
+  const page_size = parseInt(Array.from(document.getElementsByName('pageSize')[0].getElementsByTagName('option')).filter(r=> r && r.selected)[0].value);
+  const num_pages = Math.max(...Array.from(document.getElementsByClassName('pageNumberElement')).map(p=> p.innerText.trim()).filter(r=> r && /^\d+$/.test(r)).map(n=> parseInt(n)));
+  const num_titles = (page_size*num_pages);
+  const total_results = Math.ceil(num_titles/50);
+  const contain_arr = [];
+  for(let i=0; i<total_results; i++){
     const cards = await getAudibleLibraryPage(i);
     await delay(111);
     if(cards){
@@ -169,39 +176,53 @@ async function loopThroughtAudibleLibrary(){
       });
       if(cards.some(card=> card.title == 'Your First Listen')) break;
     }
+    gi(document, 'downloading_percentage_bar').style.width = `${(430 * (i / total_results))}px`;
+    gi(document, 'downloading_percentage_bar').style.background = i % 2 == 0 ? '#07ba5b' : '#3de367';
+    gi(document, 'downloading_percentage_txt').innerText = `${Math.ceil((i / total_results) * 100)}% complete`;
+  
   }
   return contain_arr;
 }
 
 async function enrichLibraryInformation(){
+  createDownloadHTML();
   var library = await loopThroughtAudibleLibrary();
   console.log(library);
   var contain_arr = [];
-  for(let i=0; i<library.length; i++){
+  gi(document, 'downloading_percentage_txt').innerText = 'Retrieving addtional information on titles...';
+  const total_results = library.length;
+  for(let i=0; i<total_results; i++){
     var details = await getBookDetails(library[i].url);
     var merge = {...library[i],...details};
     contain_arr.push(merge);
     if(i == 2) console.log(contain_arr);
     await delay(rando(1111)+1111);
+    gi(document, 'downloading_percentage_bar').style.width = `${(430 * (i / total_results))}px`;
+    gi(document, 'downloading_percentage_bar').style.background = i % 2 == 0 ? '#07ba5b' : '#3de367';
+    gi(document, 'downloading_percentage_txt').innerText = `${Math.ceil((i / total_results) * 100)}% complete -- approx ${Math.round(((((total_results-i)/100)*1.9)/60)*100)/100} minutes remaining`;
+  
   }
+  gi(document, 'downloading_percentage_bar').style.width = `430px`;
+  gi(document, 'downloading_percentage_txt').innerText = `100% complete`
   console.log(contain_arr);
   convert2TsvAndDownload(contain_arr,'audible_export_' + new Date().getTime() + '.tsv');
   downloadr2(contain_arr,'audible_export_' + new Date().getTime() + '.json');
+  if (gi(document, 'downloading_notifier')) gi(document, 'downloading_notifier').outerHTML = '';
 }
 
 
 function createDownloadHTML() {
-    if(gi(document,'downloading_notifier')) gi(document,'downloading_notifier').outerHTML = '';
-      var cont = ele('div');
-      a(cont, [['id', 'downloading_notifier'], ['style', `position: fixed; top: 100px; left: 40%; width: 430px; z-index: ${new Date().getTime()}; background: #121212; border: 1px solid #3de367; border-radius: 0.2em;`]]);
-      document.body.appendChild(cont);
-      var perc = ele('div');
-      a(perc, [['id', 'downloading_percentage_bar'], ['style', `width: 0px; height: 50px; background: #3de367; border: 1px solid #3de367; border-bottom-right-radius: 0.2em; border-top-right-radius: 0.2em;`]]);
-      cont.appendChild(perc);
-      var txt = ele('div');
-      a(txt, [['id', 'downloading_percentage_txt'], ['style', `float: left; padding: 14px; color: #fff; width: 430px;`]]);
-      perc.appendChild(txt);
-      txt.innerText = 'initiating download...';
+  if(gi(document,'downloading_notifier')) gi(document,'downloading_notifier').outerHTML = '';
+    let cont = ele('div');
+    a(cont, [['id', 'downloading_notifier'], ['style', `position: fixed; top: 100px; left: 40%; width: 430px; z-index: ${new Date().getTime()}; background: #121212; border: 1px solid #3de367; border-radius: 0.2em;`]]);
+    document.body.appendChild(cont);
+    let perc = ele('div');
+    a(perc, [['id', 'downloading_percentage_bar'], ['style', `width: 0px; height: 50px; background: #3de367; border: 1px solid #3de367; border-bottom-right-radius: 0.2em; border-top-right-radius: 0.2em; transition: all 1s;`]]);
+    cont.appendChild(perc);
+    let txt = ele('div');
+    a(txt, [['id', 'downloading_percentage_txt'], ['style', `float: left; padding: 14px; color: #fff; width: 430px;`]]);
+    perc.appendChild(txt);
+    txt.innerText = 'initiating download...';
 }
 
 enrichLibraryInformation()
