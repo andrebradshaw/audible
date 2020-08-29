@@ -64,26 +64,6 @@ function initAubibleLibraryMiner(){
     downloadr(output_, named_file);
   }
 
-  function downloadr2(arr2D, filename) {
-    var data = /.json$|.js$/.test(filename) ? JSON.stringify(arr2D) : arr2D.map(el=> el.reduce((a,b) => a+'	'+b )).reduce((a,b) => a+''+b);
-    var type = /.json$|.js$/.test(filename) ? 'data:application/json;charset=utf-8,' : 'data:text/plain;charset=utf-8,';
-    var file = new Blob([data], {    type: type  });
-    if (window.navigator.msSaveOrOpenBlob) {
-      window.navigator.msSaveOrOpenBlob(file, filename);
-    } else {
-      var a = document.createElement('a'),
-      url = URL.createObjectURL(file);
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      setTimeout(() => {
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
-      }, 10);
-    }
-  }
-
   function parseURIasJSON(url,obj) {
     if(url.match(/(?<=\?|\&)\S+?(?=\&|$)/g)) url.match(/(?<=\?|\&)\S+?(?=\&|$)/g).map(r=> r ? r.split(/\=/) : [[]]).forEach(r=> obj[r[0]] = r[1])
     return obj;
@@ -214,7 +194,6 @@ function initAubibleLibraryMiner(){
     gi(document, 'downloading_percentage_txt').innerText = `100% complete`
     console.log(contain_arr);
     convert2TsvAndDownload(contain_arr,'audible_export_' + new Date().getTime() + '.tsv');
-    downloadr2(contain_arr,'audible_export_' + new Date().getTime() + '.json');
     if (gi(document, 'downloading_notifier')) gi(document, 'downloading_notifier').outerHTML = '';
   }
 
