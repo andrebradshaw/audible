@@ -1,8 +1,8 @@
-function initAubibleLibraryMiner(){
+async function initAubibleLibraryMiner(){
     var reg = (o, n) => o ? o[n] : '';
-    var cn = (o, s) => o ? o.getElementsByClassName(s) : null;
-    var tn = (o, s) => o ? o.getElementsByTagName(s) : null;
-    var gi = (o, s) => o ? o.getElementById(s) : null;
+    var cn = (o, s) => o ? o.getElementsByClassName(s) : '';
+    var tn = (o, s) => o ? o.getElementsByTagName(s) : '';
+    var gi = (o, s) => o ? o.getElementById(s) : '';
     var rando = (n) => Math.round(Math.random() * n);
     var delay = (ms) => new Promise(res => setTimeout(res, ms));
     var ele = (t) => document.createElement(t);
@@ -124,24 +124,28 @@ function initAubibleLibraryMiner(){
     function dateString(d){
         var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
         var date = new Date(d);
-        return `${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()}`;
+        return `${date.getFullYear()} ${months[date.getMonth()]} ${date.getDate()}`;
     }
 
     function parseBookDetails(doc){
-        const categories = cn(doc,categories_class)[0] && Array.from(tn(cn(doc,categories_class)[0],'a')).length ? Array.from(tn(cn(doc,categories_class)[0],'a')).map(a=> a.innerText.trim()) : [];
-        const date = cn(doc,release_date_class)[0] ? dateString(cn(doc,release_date_class)[0].innerText.replace(/.+date:/i,'').trim()) : '';
+        let publisher_summary = cn(doc,summary)[0]?.innerText?.trim()?.replace(/Publisher's Summary\s*/,'')?.replace(/([\n\r\s]+|)©.+/,'')?.replace(/[\n\r]+(\s+|)/g,'<br>')?.replace(/\t/g,' ')?.replace(/"/g,"'");
+        let audible_og = Array.from(doc.querySelectorAll('h2')).filter(i=> /About This Audible Original/i.test(i.innerHTML))?.[0]?.parentElement.innerText?.trim()?.replace(/About This Audible Original\s*/,'')?.replace(/([\n\r\s]+|)©.+/,'')?.replace(/[\n\r]+(\s+|)/g,'<br>')?.replace(/\t/g,' ')?.replace(/"/g,"'");
+        var categories = cn(doc,categories_class)[0] && Array.from(tn(cn(doc,categories_class)[0],'a')).length ? Array.from(tn(cn(doc,categories_class)[0],'a')).map(a=> a.innerText.trim()) : [];
+        var date = cn(doc,release_date_class)[0] ? dateString(cn(doc,release_date_class)[0].innerText.replace(/.+date:/i,'').trim()) : '';
         let extra_cats = Array.from(cn(doc,'bc-chip-text'))?.map(i=> i.getAttribute('data-text'));
+        var audible_og_cats = Array.from(tn(cn(doc,'categoriesLabel')?.[0],'a')).map(i=> i.innerText);
         return cleanObject({
-            main_category: categories[0],
-            sub_category: categories[categories.length-1],
-            categories: [...categories,...extra_cats],
+            main_category: categories?.[0] || audible_og_cats?.[0],
+            sub_category: categories?.at(-1) || audible_og_cats?.at(-1),
+            categories: [...categories,...extra_cats,...audible_og_cats],
             duration_minutes: cn(doc,runtime_class)[0] ? lengthOfBookInMinutes(cn(doc,runtime_class)[0].innerText.replace(/length:/i,'').trim()) : '',
             language: cn(doc,language)?.[0]?.innerText?.replace(/[\s\n\r]*language:[\s\n\r]+/gi,'')?.trim(),
             release_date: date,
             release_timestamp: date ? new Date(date).getTime() : '',
             publisher: cn(doc,publisher_class)[0] ? cn(doc,publisher_class)[0].innerText.replace(/Publisher:/i,'').trim() : '', 
             category_type: getCatType(categories[categories.length-1]),
-            publisher_summary: cn(doc,summary)[0]?.innerText?.trim()?.replace(/Publisher's Summary\s*/,'')?.replace(/([\n\r\s]+|)©.+/,'')?.replace(/[\n\r]+(\s+|)/g,'<br>')?.replace(/\t/g,' ')?.replace(/"/g,"'"),
+            publisher_summary: publisher_summary || audible_og,
+            audible_oginal: audible_og ? true : false,
             book: /, book (\d+)/i.exec(cn(doc,series_class)?.[0]?.innerText)?.[1],
             rating: tryFloat(/[\d\.]+/.exec(cn(cn(doc,'ratingsLabel')?.[0],'bc-pub-offscreen')?.[0]?.innerText)?.[0]),
             num_ratings: tryFloat(/[\d,]+/.exec(cn(cn(doc,'ratingsLabel')?.[0],'bc-color-link')?.[0]?.innerText)?.[0]?.replace(/\D+/)),
@@ -180,22 +184,22 @@ function initAubibleLibraryMiner(){
         const total_results = Math.ceil(num_titles/50);
         const contain_arr = [];
         for(let i=0; i<total_results; i++){
-        const cards = await getAudibleLibraryPage(i);
-        await delay(111);
-        if(cards){
-            cards.forEach(card=> {
-            if( contain_arr.every(itm=> itm.url != card.url) ) contain_arr.push(card)
-            });
-            if(cards.some(card=> card.title == 'Your First Listen')) break;
-        }
-        gi(document, 'downloading_percentage_bar').style.width = `${(download_bar_width * (i / total_results))}px`;
-        gi(document, 'downloading_percentage_bar').style.background = i % 2 == 0 ? '#07ba5b' : '#3de367';
-        gi(document, 'downloading_percentage_txt').innerText = `Retrieving titles... ${Math.ceil((i / total_results) * 100)}% complete`;
+            const cards = await getAudibleLibraryPage(i);
+            await delay(111);
+            if(cards){
+                cards.forEach(card=> {
+                if( contain_arr.every(itm=> itm.url != card.url) ) contain_arr.push(card)
+                });
+                if(cards.some(card=> card.title == 'Your First Listen')) break;
+            }
+            gi(document, 'downloading_percentage_bar').style.width = `${(download_bar_width * (i / total_results))}px`;
+            gi(document, 'downloading_percentage_bar').style.background = i % 2 == 0 ? '#07ba5b' : '#3de367';
+            gi(document, 'downloading_percentage_txt').innerText = `Retrieving titles... ${Math.ceil((i / total_results) * 100)}% complete`;
         }
         return contain_arr;
     }
 
-    async function enrichLibraryInformation(){
+    async function enrichLibraryInformation(order_information){
         createDownloadHTML();
         var library = await loopThroughtAudibleLibrary();
         var contain_arr = [];
@@ -214,7 +218,14 @@ function initAubibleLibraryMiner(){
         gi(document, 'downloading_percentage_bar').style.width = `${download_bar_width}px`;
         gi(document, 'downloading_percentage_txt').innerText = `100% complete`
         console.log(contain_arr);
-        convert2TsvAndDownload(contain_arr,'audible_export_' + new Date().getTime() + '.tsv');
+        let merged_with_orders = contain_arr.map(r=> {
+            let order = order_information.filter(i=> i.url == r.url);
+            return {
+                ...r,
+                ...(order?.[0] ? order?.[0] : {})
+            }
+        });        
+        convert2TsvAndDownload(merged_with_orders,'audible_export_' + new Date().getTime() + '.tsv');
         if (gi(document, 'downloading_notifier')) gi(document, 'downloading_notifier').outerHTML = '';
     }
 
@@ -228,11 +239,68 @@ function initAubibleLibraryMiner(){
         a(perc, [['id', 'downloading_percentage_bar'], ['style', `width: 0px; height: 50px; background: #3de367; border: 1px solid #3de367; border-bottom-right-radius: 0.2em; border-top-right-radius: 0.2em; transition: all 1s;`]]);
         cont.appendChild(perc);
         let txt = ele('div');
-        a(txt, [['id', 'downloading_percentage_txt'], ['style', `float: left; padding: 14px; color: #fff; width: 430px;`]]);
+        a(txt, [['id', 'downloading_percentage_txt'], ['style', `float: left; padding: 14px; color: #fff; width: ${download_bar_width-50}px;`]]);
         perc.appendChild(txt);
         txt.innerText = 'initiating download...';
     }
 
-    enrichLibraryInformation()
+
+    
+    async function getAllOrders(){
+        createDownloadHTML();
+        gi(document, 'downloading_percentage_txt').innerText = `Retrieving last year's purchases...`;
+        var unqHsh = (a,o) => a.filter(i=> o.hasOwnProperty(i) ? false : (o[i] = true));
+        var rando = (n) => Math.round(Math.random() * n);
+        var delay = (ms) => new Promise(res => setTimeout(res, ms));
+        function unqKey(array,key){  var q = [];  var map = new Map();  for (const item of array) {    if(!map.has(item[key])){        map.set(item[key], true);        q.push(item);    }  }  return q;}
+        async function getOrderPageByDate(df,p){
+            var doc = await fetchDoc(`https://www.audible.com/account/purchase-history?ref=&tf=orders&df=${df}&ps=40&pn=${p}`);
+            var order_date_sel = Array.from(tn(gi(doc,'ui-it-purchase-history-date-filter'),'option')).map(t=> t.value);
+            var pages = Array.from(tn(cn(doc,'purchase-history-pagination-wrapper')?.[0],'a'))?.map(r=> /&pn=(\d+)/.exec(r.href)?.[1]);
+            var titles = Array.from(tn(tn(doc,'tbody')?.[0],'tr')).map(tr=> {
+                let purchase_date = cn(tr,'ui-it-purchasehistory-item-purchasedate')?.[0]?.innerText?.trim();
+                return {
+                    url: /.+?(?=\?)/.exec(tn(tr,'a')?.[0]?.href)?.[0],
+                    title: /.+(?=[\s\n]+By:)/.exec(cn(tr,'ui-it-purchasehistory-item-title')?.[0]?.innerText)?.[0],
+                    author: /(?<=[\s\n]+By: ).+/.exec(cn(tr,'ui-it-purchasehistory-item-title')?.[0]?.innerText)?.[0],
+                    purchase_date: purchase_date ? dateString(purchase_date) : purchase_date,
+                }
+            }).filter(r=> r.title && r.author);
+            return {titles: titles,order_date_sel:order_date_sel,pages:pages?.length ? unqHsh(pages,{}): []};
+        }
+        var first_page = await getOrderPageByDate('last_365_days',1);
+        var titles = first_page.titles
+        for(let i=0; i<first_page.pages.length; i++){
+            let next_page = await getOrderPageByDate('last_365_days',first_page.pages[i]);
+            next_page?.titles?.forEach(title=> titles.push(title));
+        }
+        let last_year = Math.min(...titles.map(t=> /^\d{4}/.exec(t.purchase_date)?.[0]).filter(t=> t).map(t=> parseInt(t)));
+
+        let years_loop = first_page.order_date_sel.slice(first_page.order_date_sel.indexOf(last_year.toString()),20);
+        await delay(rando(333)+666);
+
+        for(let y=0; y<years_loop.length; y++){
+            let page = await getOrderPageByDate(years_loop[y],1);
+            page?.titles?.forEach(title=> titles.push(title));
+            gi(document, 'downloading_percentage_bar').style.width = `${(download_bar_width * (y / years_loop.length))}px`;
+            gi(document, 'downloading_percentage_bar').style.background = y % 2 == 0 ? '#07ba5b' : '#3de367';
+            gi(document, 'downloading_percentage_txt').innerText = `Retrieving ${years_loop[y]} purchases...`;
+            for(let i=0; i<page.pages.length; i++){
+                let next_page = await getOrderPageByDate(years_loop[y],page.pages[i]);
+                next_page?.titles?.forEach(title=> titles.push(title));
+                gi(document, 'downloading_percentage_txt').innerText = `Retrieving ${years_loop[i]} purchases... page: ${page.pages[i]}`;
+            }
+            await delay(rando(333)+666);
+        }
+        return unqKey(titles,'url');
+    }
+    try{
+        var order_information = await getAllOrders();
+        enrichLibraryInformation(order_information);
+    }
+    catch(err){
+        alert('please log in');
+        window.open('https://www.audible.com/account/purchase-history','_self')
+    }
 }
 initAubibleLibraryMiner()
