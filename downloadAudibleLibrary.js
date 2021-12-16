@@ -190,7 +190,7 @@ function initAubibleLibraryMiner(){
         }
         gi(document, 'downloading_percentage_bar').style.width = `${(download_bar_width * (i / total_results))}px`;
         gi(document, 'downloading_percentage_bar').style.background = i % 2 == 0 ? '#07ba5b' : '#3de367';
-        gi(document, 'downloading_percentage_txt').innerText = `${Math.ceil((i / total_results) * 100)}% complete`;
+        gi(document, 'downloading_percentage_txt').innerText = `Retrieving titles... ${Math.ceil((i / total_results) * 100)}% complete`;
         }
         return contain_arr;
     }
@@ -209,7 +209,7 @@ function initAubibleLibraryMiner(){
             await delay(rando(1111)+1111);
             gi(document, 'downloading_percentage_bar').style.width = `${(download_bar_width * (i / total_results))}px`;
             gi(document, 'downloading_percentage_bar').style.background = i % 2 == 0 ? '#07ba5b' : '#3de367';
-            gi(document, 'downloading_percentage_txt').innerText = `${Math.ceil((i / total_results) * 100)}% complete -- approx ${Math.round(((((total_results-i)/100)*1.9)/60)*100)} minutes remaining`;
+            gi(document, 'downloading_percentage_txt').innerText = `${merge.author} - ${Math.ceil((i / total_results) * 100)}% complete -- approx ${Math.round(((((total_results-i)/100)*1.9)/60)*100)} minutes remaining`;
         }
         gi(document, 'downloading_percentage_bar').style.width = `${download_bar_width}px`;
         gi(document, 'downloading_percentage_txt').innerText = `100% complete`
